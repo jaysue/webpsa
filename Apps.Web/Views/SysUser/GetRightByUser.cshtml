@@ -1,0 +1,179 @@
+﻿@using Apps.Web.Core;
+@using Apps.Common;
+@using Apps.Models.Sys;
+@using Apps.Locale;
+@{
+    ViewBag.Title = "设置用户包含的功能模块";
+    Layout = "~/Views/Shared/_Index_LayoutEdit.cshtml";
+
+    List<permModel> perm = null;
+}
+
+<div class="mvctool bgb">
+
+    @Html.ToolButton("btnSave", "fa fa-save", Resource.Save, ref perm, "Create", true)
+
+</div>
+
+<div>
+    <table style="width: 900px;align-content:center">
+        <tbody>
+            <tr>
+                <td style="width:3px;"></td>
+                <td style="width: 400px; vertical-align: top">
+                    <table id="ModuleList"></table>
+                </td>
+                <td style="width:3px;"></td>
+                <td style="vertical-align: top">
+                    <table id="operateList"></table>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<script type="text/javascript">
+
+    $(function () {
+        var curModuleId, curUserId, curModuleName;//选择的模块ID,选中的角色ID，选中的模块名称，角色名称
+        $('#ModuleList').treegrid({
+            url: '/SysUser/GetMuduleRightListByUser?userId=@(ViewBag.UserId)&id=0',
+            width: 400,
+            methord: 'post',
+            height: SetGridHeightSub(45),
+            fitColumns: true,
+            treeField: 'Name',
+            idField: 'Id',
+            pagination: false,
+            striped: true, //奇偶行是否区分
+            singleSelect: true,//单选模式
+            title: '模块列表',
+            columns: [[
+                { field: 'Id', title: '唯一标识', width: 20, hidden: true },
+                { field: 'Name', title: '@Resource.TitleName', width: 120, sortable: true },
+                { field: 'EnglishName', title: '英文名称', width: 60, sortable: true, hidden: true },
+                { field: 'ParentId', title: '上级Id', width: 60, sortable: true, hidden: true },
+                {
+                    field: 'Enable', title: '@Resource.TitleEnable', width: 40, align: 'center', formatter: function (value) {
+                        if (value) {
+                            return "<span class='color-green fa fa-circle'></span>";
+                        } else {
+                            return "<span class='color-blue fa fa-circle'></span>";
+                        }
+                    }, hidden: true
+                },
+                {
+                    field: 'IsLast', title: '是否最后一项', align: 'center', width: 500, formatter: function (value) {
+                        if (value) {
+                            return "是";
+                        } else {
+                            return "否";
+                        }
+                    }, hidden: true
+                },
+                {
+                    field: 'Rightflag', title: "<a href='#' title='@Resource.Select' class=\"fa  fa-check-square-o color-green\"  onclick=\"SelAllM();\"></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='#' title='@Resource.UnSelect' class=\"fa  fa-square-o color-gray\" onclick=\"UnSelAllM();\"  ></a>", align: 'center', width: 30, formatter: function (value) {
+                        if (value) {
+                            return "<input type='checkbox' checked='checked' value=" + value + " />";
+                        } else {
+                            return "<input type='checkbox' value=" + value + " />";
+                        }
+                    },
+                },
+            ]],
+            onClickRow: function (index, data) {
+                var row = $('#ModuleList').treegrid('getSelected');
+                if (row != null) {
+                    curModuleName = row.Name;
+                    curModuleId = row.Id;
+                    $('#operateList').datagrid({ url: "/SysUser/GetRightByUserAndModule?UserId=@(ViewBag.UserId)"+ "&ModuleId=" + curModuleId + "" });
+                }
+            }
+        })
+    });
+    $('#operateList').datagrid({
+        url: '/SysUser/GetRightByUserAndModule?UserId=@(ViewBag.UserId)&ModuleId=0',
+        width: 500,
+        methord: 'post',
+        fitColumns: true,
+        sortName: 'RightId',
+        sortOrder: 'desc',
+        idField: 'Id',
+        striped: true, //奇偶行是否区分
+        singleSelect: true,//单选模式
+        title: '授权操作',
+        //rownumbers: true,//行号
+        columns: [[
+            { field: 'Id', title: 'Id', width: 80, hidden: true },
+            { field: 'Name', title: '@Resource.TitleName', width: 80, sortable: true },
+            { field: 'KeyCode', title: '操作码', width: 80, sortable: true },
+            {
+                field: 'IsValid', title: "<a href='#' title='@Resource.Select' class=\"fa  fa-check-square-o color-green\"  onclick=\"SelAll();\"></a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='#' title='@Resource.UnSelect' class=\"fa  fa-square-o color-gray\" onclick=\"UnSelAll();\"  ></a>", align: 'center', width: 30, formatter: function (value) {
+                    if (value) {
+                        return "<input type='checkbox' checked='checked' value=" + value + " />";
+                    } else {
+                        return "<input type='checkbox' value=" + value + " />";
+                    }
+                },
+            },
+              { field: 'RightId', title: '模块ID', width: 80, sortable: true, hidden: false }
+        ]]
+    });
+</script>
+
+@*operation*@
+<script type="text/javascript">
+    $("#btnSave").click(function () {
+            var updateRows = 0;
+            var updateMRows = 0;
+            var rows = $("#operateList").datagrid("getRows"); //获取当前页的操作所有行。
+            if ('@(ViewBag.UserId)' == null) {
+                $.messageBox5s('@Resource.Tip', "请再选择一个用户！");
+                return;
+            } else {
+            var arrayM = "";
+            $("td[field='Rightflag'] input:checked").each(function () {
+                var id = $(this).parent().parent().parent().children("td[field='Id']").children('div').html();
+                arrayM = arrayM + '|' + id;
+            });
+            $.ajax({
+                url: '@Url.Action("UpdateUserModuleRight")',
+                async: false, // 注意此处需要同步，因为返回完数据后，下面才能让结果的第一条selected
+                type: "POST",
+                data: { "Modules": arrayM, "UserId": '@(ViewBag.UserId)' },
+                dataType: "json",
+                success: function (fields) {
+                    updateMRows++;
+                }
+            });
+
+            for (var i = 0; i < rows.length; i++) {
+                var setFlag = $("td[field='IsValid'] input").eq(i).prop("checked");
+                var ids = rows[i].Id;
+                var rightId = rows[i].RightId;
+                var keyCode = rows[i].KeyCode;
+                var isValid = rows[i].IsValid;
+                var name = rows[i].Name;
+                if (isValid != setFlag)//判断是否有作修改
+                {
+                    $.ajax({
+                        url: '@Url.Action("UpdateModuleOperateRight")',
+                        async: false, // 注意此处需要同步，因为返回完数据后，下面才能让结果的第一条selected
+                        type: "POST",
+                        data: { "Id": ids, "RightId": rightId, "KeyCode": keyCode, "IsValid": setFlag,"Name":name },
+                        dataType: "json",
+                        success: function (fields) {
+                            updateRows++;
+                        }
+                    });
+                  
+                }
+            } }
+        if ((updateRows > 0) && (updateMRows > 0)) {
+                $.messageBox5s('@Resource.Tip', '保存成功！');
+            } else {
+                $.messageBox5s('@Resource.Tip', '@Resource.NoAnyChanges！');
+            }
+        });
+</script>
+
+
